@@ -1,24 +1,21 @@
 import os
-import random
 import requests
 from gtts import gTTS
-from moviepy.editor import (
-    ImageClip, VideoFileClip, concatenate_videoclips,
-    AudioFileClip, CompositeAudioClip, vfx
-)
+from moviepy.editor import ImageClip, VideoFileClip, concatenate_videoclips, AudioFileClip, vfx, CompositeVideoClip
 from PIL import Image
 from pexels_api import API as PexelsAPI
 from pixabay import PixabayAPI
-from dotenv import load_dotenv
+import random
+import tempfile
+
+# Google API for YouTube upload
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
-import datetime
 
 # ---------------------------
-# Load environment variables
+# Load API keys
 # ---------------------------
-load_dotenv()
 YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
 YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
 YOUTUBE_REFRESH_TOKEN = os.getenv("YOUTUBE_REFRESH_TOKEN")
@@ -39,129 +36,129 @@ for folder in [IMAGES_DIR, VIDEOS_DIR, AUDIO_DIR, THUMB_DIR]:
     os.makedirs(folder, exist_ok=True)
 
 # ---------------------------
-# 1️⃣ Generate story automatically
+# 1️⃣ Generate story automatically (example)
 # ---------------------------
-def generate_story(scenes=50):
-    base_scenes = [
-        "A mysterious shadow appears in the dark alley.",
-        "The victim hears a whisper but no one is there.",
-        "Suddenly, a chilling scream echoes in the night.",
-        "Footsteps approach slowly, but vanish.",
-        "The room turns cold as the lights flicker."
-    ]
-    return [random.choice(base_scenes) for _ in range(scenes)]
-
-story = generate_story(50)  # 50 scenes for 1hr+ video
+story = [
+    "A mysterious shadow appears in the dark alley.",
+    "The victim hears a whisper but no one is there.",
+    "Suddenly, a chilling scream echoes in the night.",
+    "Footsteps approach slowly, but vanish.",
+    "The room turns cold as the lights flicker."
+]
 
 # ---------------------------
-# 2️⃣ Fetch images/videos (B&W)
+# 2️⃣ Fetch images/videos
 # ---------------------------
 pexels = PexelsAPI(PEXELS_API_KEY)
 pixabay = PixabayAPI(PIXABAY_API_KEY)
 
-def fetch_media(query, idx):
-    """Return local path of either image or short video."""
-    # Randomly choose image or video
+def fetch_image_or_video(query):
+    # Try Pexels photos
     try:
-        if random.random() < 0.5:  # 50% chance for image
-            # Pexels image
-            pexels.search(query, page=1, results_per_page=1)
-            photos = pexels.get_entries()
-            if photos:
-                url = getattr(photos[0], "original", photos[0].src['original'])
-                path = os.path.join(IMAGES_DIR, f"img_{idx}.jpg")
-                data = requests.get(url, timeout=10).content
-                with open(path, "wb") as f:
-                    f.write(data)
-                # Convert to B&W
-                im = Image.open(path).convert("L")
-                im.save(path)
-                return path, "image"
-        else:
-            # Pixabay video fallback
-            results = pixabay.video_search(query=query)
-            if results and 'hits' in results and len(results['hits']) > 0:
-                url = results['hits'][0]['videos']['medium']['url']
-                path = os.path.join(VIDEOS_DIR, f"vid_{idx}.mp4")
-                data = requests.get(url, timeout=15).content
-                with open(path, "wb") as f:
-                    f.write(data)
-                return path, "video"
+        pexels.search(query, page=1, results_per_page=1)
+        entries = pexels.get_entries()
+        if entries:
+            url = getattr(entries[0], "original", entries[0].src['original'])
+            return requests.get(url, timeout=10).content, "image"
     except:
         pass
-    # Fallback: black image placeholder
-    path = os.path.join(IMAGES_DIR, f"placeholder_{idx}.jpg")
-    img = Image.new("RGB", (1280, 720), color=(0,0,0))
-    img.save(path)
-    return path, "image"
+    # Try Pixabay image/video
+    try:
+        res = pixabay.image_search(query=query)
+        if res and 'hits' in res and len(res['hits'])>0:
+            url = res['hits'][0]['largeImageURL']
+            return requests.get(url, timeout=10).content, "image"
+    except:
+        pass
+    # fallback black image
+    img = Image.new("RGB", (1280, 720), (0,0,0))
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+    img.save(tmp_file.name)
+    with open(tmp_file.name, "rb") as f:
+        return f.read(), "image"
 
-media_files = [fetch_media("dark mysterious black and white scene", i) for i in range(len(story))]
+image_files = []
+video_files = []
+
+for i, scene in enumerate(story):
+    data, ftype = fetch_image_or_video("dark mysterious scene")
+    if ftype=="image":
+        path = os.path.join(IMAGES_DIR, f"img_{i}.jpg")
+    else:
+        path = os.path.join(VIDEOS_DIR, f"vid_{i}.mp4")
+    with open(path, "wb") as f:
+        f.write(data)
+    if ftype=="image":
+        image_files.append(path)
+    else:
+        video_files.append(path)
 
 # ---------------------------
-# 3️⃣ Generate TTS
+# 3️⃣ Generate TTS audio
 # ---------------------------
 tts_file = os.path.join(AUDIO_DIR, "voice.mp3")
 tts = gTTS(" ".join(story))
 tts.save(tts_file)
 
 # ---------------------------
-# 4️⃣ Combine clips
+# 4️⃣ Create video
 # ---------------------------
 clips = []
-for path, mtype in media_files:
-    duration = random.randint(5,10)
-    if mtype == "image":
-        clip = ImageClip(path).set_duration(duration)
-        clip = clip.fx(vfx.zoom_in, 1.05)
-    else:  # video
-        clip = VideoFileClip(path)
-        if clip.duration > duration:
-            clip = clip.subclip(0, duration)
-        # Convert to B&W
-        clip = clip.fx(vfx.blackwhite)
+
+# 5-10 sec per clip
+duration = 7
+
+# Images
+for img_path in image_files:
+    clip = ImageClip(img_path).set_duration(duration).fx(vfx.blackwhite)
+    clip = clip.fx(vfx.zoom_in, 1.05)
     clips.append(clip)
 
-video = concatenate_videoclips(clips, method="compose")
+# Videos
+for vid_path in video_files:
+    clip = VideoFileClip(vid_path).subclip(0, duration).fx(vfx.blackwhite)
+    clips.append(clip)
+
+final_clip = concatenate_videoclips(clips, method="compose")
 audio = AudioFileClip(tts_file)
-video = video.set_audio(audio)
-video.write_videofile(FINAL_VIDEO, fps=24)
+final_clip = final_clip.set_audio(audio)
+
+final_clip.write_videofile(FINAL_VIDEO, fps=24)
 
 # ---------------------------
 # 5️⃣ Thumbnail
 # ---------------------------
 thumb_path = os.path.join(THUMB_DIR, "thumb.jpg")
-im = Image.open(media_files[0][0]).resize((1280, 720))
+im = Image.open(image_files[0])
+im = im.resize((1280,720))
 im.save(thumb_path)
 
 # ---------------------------
 # 6️⃣ Upload to YouTube
 # ---------------------------
-def upload_youtube(title, description, file_path, thumb_path):
-    creds = Credentials(
-        None,
-        refresh_token=YOUTUBE_REFRESH_TOKEN,
-        client_id=YOUTUBE_CLIENT_ID,
-        client_secret=YOUTUBE_CLIENT_SECRET,
-        token_uri="https://oauth2.googleapis.com/token"
-    )
-    youtube = build("youtube", "v3", credentials=creds)
+creds = Credentials(
+    token=None,
+    refresh_token=YOUTUBE_REFRESH_TOKEN,
+    client_id=YOUTUBE_CLIENT_ID,
+    client_secret=YOUTUBE_CLIENT_SECRET,
+    token_uri="https://oauth2.googleapis.com/token"
+)
+youtube = build("youtube", "v3", credentials=creds)
 
-    request = youtube.videos().insert(
-        part="snippet,status",
-        body={
-            "snippet": {"title": title, "description": description, "categoryId":"27"},
-            "status": {"privacyStatus": "public"}
+request = youtube.videos().insert(
+    part="snippet,status",
+    body={
+        "snippet": {
+            "title": "Daily Horror Story",
+            "description": "Automated story video",
+            "tags": ["horror","story","daily"],
+            "categoryId": "24"
         },
-        media_body=MediaFileUpload(file_path)
-    )
-    response = request.execute()
-    video_id = response["id"]
-    youtube.thumbnails().set(videoId=video_id, media_body=MediaFileUpload(thumb_path)).execute()
-    print(f"✅ Uploaded video: https://youtu.be/{video_id}")
-
-today = datetime.date.today().strftime("%B %d, %Y")
-video_title = f"Mysterious Stories {today}"
-video_desc = "Daily automated mysterious story in black & white with chilling audio and stock videos/images."
-upload_youtube(video_title, video_desc, FINAL_VIDEO, thumb_path)
-
-print("🎬 All done!")
+        "status": {
+            "privacyStatus": "public"
+        }
+    },
+    media_body=MediaFileUpload(FINAL_VIDEO)
+)
+response = request.execute()
+print("✅ Uploaded:", response)
