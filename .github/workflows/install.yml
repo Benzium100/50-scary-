@@ -1,17 +1,30 @@
 name: Daily YouTube Automation
 
-# Trigger workflow daily at 1 PM UTC
+# Trigger workflow daily at 1 PM UTC and allow manual run
 on:
   schedule:
     - cron: '0 13 * * *'  # Every day at 13:00 UTC
-  workflow_dispatch:       # Optional: allows manual run
+  workflow_dispatch:       # Allows manual run
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # YouTube credentials
+      YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+      YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      
+      # Pexels API keys
+      PEXELS_API_KEY_1: ${{ secrets.PEXELS_API_KEY_1 }}
+      PEXELS_API_KEY_2: ${{ secrets.PEXELS_API_KEY_2 }}
+      
+      # Pixabay API keys
+      PIXABAY_API_KEY_1: ${{ secrets.PIXABAY_API_KEY_1 }}
+      PIXABAY_API_KEY_2: ${{ secrets.PIXABAY_API_KEY_2 }}
 
     steps:
-      # 1️⃣ Checkout your repo
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -27,6 +40,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # 4️⃣ Run main automation script
+      - name: Run main script
+        run: python main.py
       # 4️⃣ Run your Python automation script
       - name: Run automation
         env:
