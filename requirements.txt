@@ -1,8 +1,25 @@
+# 1️⃣ TTS
 gtts
-ffmpeg-python
-requests
+
+# 2️⃣ Video creation & effects
 moviepy
+ffmpeg-python
 Pillow
+
+# 3️⃣ Image APIs
 pexels-api
 pixabay-api
+requests
+
+# 4️⃣ Local LLM for story generation
+transformers
+torch
+sentencepiece
+
+# 5️⃣ YouTube upload
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+
+# 6️⃣ Environment variables
 python-dotenv
