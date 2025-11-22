@@ -1,1 +1,21 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Content folders (generated media)
+content/
+content/images/
+content/audio/
+content/thumbnails/
+content/videos/
+
+# Secrets or environment files
 .env
+*.env
+
+# VS Code / IDE configs
+.vscode/
+*.code-workspace
+
+# Misc
+.DS_Store
