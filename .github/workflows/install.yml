@@ -1,0 +1,21 @@
+name: Install Dependencies
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install gtts ffmpeg-python requests moviepy Pillow pexels-api pixabay-api python-dotenv
+          sudo apt update
+          sudo apt install ffmpeg -y
