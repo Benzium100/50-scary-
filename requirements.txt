@@ -1,0 +1,8 @@
+gtts
+ffmpeg-python
+requests
+moviepy
+Pillow
+pexels-api
+pixabay-api
+python-dotenv
