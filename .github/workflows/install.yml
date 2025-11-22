@@ -1,21 +1,41 @@
-name: Install Dependencies
+name: Daily YouTube Automation
 
+# Trigger workflow daily at 1 PM UTC
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: '0 13 * * *'  # Every day at 13:00 UTC
+  workflow_dispatch:       # Optional: allows manual run
 
 jobs:
-  install:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
+      # 1️⃣ Checkout your repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: |
-          pip install gtts ffmpeg-python requests moviepy Pillow pexels-api pixabay-api python-dotenv
-          sudo apt update
-          sudo apt install ffmpeg -y
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4️⃣ Run your Python automation script
+      - name: Run automation
+        env:
+          PEXELS_API_KEY_1: ${{ secrets.PEXELS_API_KEY_1 }}
+          PEXELS_API_KEY_2: ${{ secrets.PEXELS_API_KEY_2 }}
+          PIXABAY_API_KEY_1: ${{ secrets.PIXABAY_API_KEY_1 }}
+          PIXABAY_API_KEY_2: ${{ secrets.PIXABAY_API_KEY_2 }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          python main.py
